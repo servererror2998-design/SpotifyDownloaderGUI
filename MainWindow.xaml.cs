@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Forms;
 
 namespace SpotifyDownloaderGUI;
@@ -133,7 +134,6 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             LogText.Text = line;
-            // Optional conventional backend progress format: [NN%]
             var marker = line.IndexOf('%');
             if (marker > 0)
             {
