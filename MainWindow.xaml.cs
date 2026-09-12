@@ -40,9 +40,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        var backend = File.Exists(_defaultBackend) ? _defaultBackend : "spotify-dl.exe";
-        var format = ((ComboBoxItem)FormatBox.SelectedItem).Content?.ToString()?.ToLowerInvariant() ?? "mp3";
-        var quality = ((ComboBoxItem)QualityBox.SelectedItem).Content?.ToString()?.Replace(" kbps", "") ?? "320";
+        // Never fall back to PATH: doing so caused an opaque error when the backend
+        // was not bundled with the portable application.
+        if (!File.Exists(_defaultBackend))
+        {
+            StatusText.Text = "Backend unavailable";
+            LogText.Text = "The download backend is not included in this build. " +
+                           "This GUI cannot download Spotify audio by itself. " +
+                           "Use the app for supported/local audio workflows or install a compliant backend separately.";
+            System.Windows.MessageBox.Show(
+                this,
+                "Download backend not found.\n\nExpected file:\n" + _defaultBackend +
+                "\n\nThe current build does not include a Spotify audio-download backend.",
+                "Backend unavailable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var format = (FormatBox.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant() ?? "mp3";
+        var quality = (QualityBox.SelectedItem as ComboBoxItem)?.Content?.ToString()?.Replace(" kbps", "") ?? "320";
         var output = OutputBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(output))
         {
@@ -61,12 +78,12 @@ public partial class MainWindow : Window
         {
             var psi = new ProcessStartInfo
             {
-                FileName = backend,
+                FileName = _defaultBackend,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = AppContext.BaseDirectory
+                WorkingDirectory = Path.GetDirectoryName(_defaultBackend) ?? AppContext.BaseDirectory
             };
             psi.ArgumentList.Add("--url");
             psi.ArgumentList.Add(url);
@@ -97,6 +114,7 @@ public partial class MainWindow : Window
             else
             {
                 StatusText.Text = $"Backend failed (exit {process.ExitCode})";
+                LogText.Text = $"Backend exited with code {process.ExitCode}. See the log above for details.";
             }
         }
         catch (OperationCanceledException)
@@ -137,8 +155,8 @@ public partial class MainWindow : Window
             var marker = line.IndexOf('%');
             if (marker > 0)
             {
-                var start = marker - 3;
-                while (start >= 0 && char.IsDigit(line[start])) start--;
+                var start = marker - 1;
+                while (start >= 0 && (char.IsDigit(line[start]) || line[start] == '.')) start--;
                 var number = line[(start + 1)..marker];
                 if (double.TryParse(number, out var pct))
                     Progress.Value = Math.Clamp(pct, 0, 100);
